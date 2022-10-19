@@ -17,12 +17,12 @@ import math
 
 
 # using in Linux
-# from torch.nn.common_types import _size_2_t
+from torch.nn.common_types import _size_2_t
 # using in Windows
-from typing import TypeVar, Union, Tuple
-T = TypeVar('T')
-_scalar_or_tuple_2_t = Union[T, Tuple[T, T]]
-_size_2_t = _scalar_or_tuple_2_t[int]
+# from typing import TypeVar, Union, Tuple
+# T = TypeVar('T')
+# _scalar_or_tuple_2_t = Union[T, Tuple[T, T]]
+# _size_2_t = _scalar_or_tuple_2_t[int]
 
 class SparseConv2d(nn.Module):
     def __init__(
@@ -99,7 +99,6 @@ class SparseConv2d(nn.Module):
                 self.block_row_idx, self.block_col_idx = extract_dense(self, block_size, self.nblocks)
 
     def update_conv_weight_mask(self, iterations, alpha, T_end, block_size):
-        rigl_drop_num = 0
         if self.sparsity != 0 and self.nblocks>0:
             mask_before = self.weight_mask.clone()
             sparsity_decay = alpha / 2 * (1 + math.cos(iterations * math.pi / T_end))

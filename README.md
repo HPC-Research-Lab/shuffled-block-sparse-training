@@ -23,11 +23,11 @@ We provide the training codes for DSB(Dynamic Shuffled Block) and SSB(Static Shu
 To train a **RigL model**, we just need to use --block_size 0.
 * To train WideResNet22-2 on CIFAR10 with block_size=16 and sparsity=0.9, run the following command:
 ```
-python main.py --data_set cifar10 --data_dir YOUR_DATA_PATH --model wrn-22-2 --lr 0.1 --batch_size 128 --sparsity 0.9 --epochs 160 --T_end 75000 --T 100 --batch-size 128 --block_size 16
+python main.py --data_set cifar10 --data_dir YOUR_DATA_PATH --model wrn-22-2 --lr 0.1 --batch_size 128 --sparsity 0.9 --epochs 160 --T_end 75000 --T 100 --block_size 16
 ```
 * To train VGG-16 on CIFAR100 with block_size=16 and sparsity=0.9, run the following command:
 ```
-python main.py --data_set cifar100 --data_dir YOUR_DATA_PATH --model vgg-d --lr 0.1 --batch_size 128 --sparsity 0.9 --epochs 160 --T_end 75000 --T 100 --batch-size 128 --block_size 16
+python main.py --data_set cifar100 --data_dir YOUR_DATA_PATH --model vgg-d --lr 0.1 --batch_size 128 --sparsity 0.9 --epochs 160 --T_end 75000 --T 100 --block_size 16
 ```
 
 ## Training On ImageNet/Tiny-ImageNet
