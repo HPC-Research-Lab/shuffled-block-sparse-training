@@ -186,17 +186,17 @@ class VGG16(nn.Module):
         if config == 'C' or config == 'D':
             self.classifier = nn.Sequential(
                 SparseLinear((512 if config == 'D' else 2048), 512),  # 512 * 7 * 7 in the original VGG
-                nn.ReLU(True),
+                nn.ReLU(),
                 nn.BatchNorm1d(512),  # instead of dropout
                 SparseLinear(512, 512),
-                nn.ReLU(True),
+                nn.ReLU(),
                 nn.BatchNorm1d(512),  # instead of dropout
                 SparseLinear(512, num_classes),
             )
         else:
             self.classifier = nn.Sequential(
                 SparseLinear(512, 512),  # 512 * 7 * 7 in the original VGG
-                nn.ReLU(True),
+                nn.ReLU(),
                 nn.BatchNorm1d(512),  # instead of dropout
                 SparseLinear(512, num_classes),
             )
