@@ -13,8 +13,8 @@ def extract_dense(layer, block_size, num_blocks, grow_mask=None):
 
 	if grow_mask != None:
 		sparse_grow_mask = grow_mask.view(layer.out_channels, -1)
-		# masked_weight[sparse_grow_mask==1] = torch.mean(masked_weight[masked_weight>0])
-		masked_weight[sparse_grow_mask==1] = torch.quantile(masked_weight[masked_weight>0], 0.8,dim=0,keepdim=True,interpolation='higher')
+		masked_weight[sparse_grow_mask==1] = torch.mean(masked_weight[masked_weight>0])
+		# masked_weight[sparse_grow_mask==1] = torch.quantile(masked_weight[masked_weight>0], 0.8,dim=0,keepdim=True,interpolation='higher')
 	sim = torch.cosine_similarity(sparse_weight_mask.float().unsqueeze(1),sparse_weight_mask.float().unsqueeze(0), dim=-1)
 	jaccard_similarity = 1 - sim
 	cluster = AgglomerativeClustering(n_clusters=max(layer.out_channels//(block_size), 1), affinity='precomputed', linkage='complete')
