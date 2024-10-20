@@ -143,6 +143,70 @@ class SparseConv2d(nn.Module):
             self.weight.data[grow_mask] = 0
             if block_size > 0 and self.nblocks != 0 and drop_num > 0:
                 self.block_row_idx, self.block_col_idx = extract_dense(self, block_size, self.nblocks, grow_mask=grow_mask)
+    
+    
+    def update_conv_weight_mask_sparse(self, iterations, alpha, T_end, block_size):
+        if self.sparsity != 0 and self.nblocks>0:
+            mask_before = self.weight_mask.clone()
+            sparsity_decay = alpha / 2 * (1 + math.cos(iterations * math.pi / T_end))
+            drop_blocks = self.nblocks * sparsity_decay
+            remain_num = self.weight_num_active - drop_num
+            self.pre_mask = self.weight_mask.clone()
+            weight_with_mask = torch.mul(self.weight.detach(), self.weight_mask)
+            values, _ = torch.abs(weight_with_mask.view(-1)).topk(remain_num, dim=0, largest=True, sorted=True)
+            threshold_drop = values[remain_num-1]
+            drop_mask = torch.logical_and((torch.abs(weight_with_mask) < threshold_drop), self.weight_mask)
+            drop_mask_rest = torch.logical_and((torch.abs(weight_with_mask) == threshold_drop), self.weight_mask)
+            drop_mask_idx = torch.nonzero(drop_mask_rest.view(-1))[: int(torch.sum(self.weight_mask)) - remain_num - int(torch.sum(drop_mask))]
+            drop_mask = drop_mask.view(-1)
+            drop_mask[drop_mask_idx] = 1
+            dropped_mask = drop_mask.view(self.out_channels, -1)
+            for i in range(len(self.block_row_idx)):
+                row = self.block_row_idx[i]
+                col = self.block_col_idx[i]
+                temp_drop = dropped_mask[torch.meshgrid(row, col, indexing='ij')]
+                col_mask_count = torch.sum(temp_drop, dim=0)
+                row_mask_count = torch.sum(temp_drop, dim=1)
+                col_mask_count = col_mask_count<block_size/2
+                row_mask_count = row_mask_count<block_size/2
+                set_B = ~(row_mask_count.reshape(-1,1)*col_mask_count)
+                dropped_mask[torch.meshgrid(row, col, indexing='ij')] = torch.logical_and(set_B, temp_drop)
+            drop_mask = dropped_mask.reshape(weight_with_mask.shape)
+            self.weight_mask[drop_mask] = 0
+            drop_num = drop_mask.sum().item()
+            
+            #grow same number of blocks
+            dout_estimate = self.dout.view(self.out_channels, -1)
+            input_estimate = self.input.view(self.input.shape[1], -1)
+            input_estimate = F.pad(self.input, (1,1,1,1))
+            input_estimate = input_estimate.unfold(2, self.dout.shape[2], 1)
+            input_estimate = input_estimate.unfold(3, self.dout.shape[3], 1)
+            input_estimate = input_estimate.reshape(dout_estimate.shape[1], -1)
+            
+            norm_x, idx_x = torch.linalg.vector_norm(dout_estimate, dim=(1)).sort(descending=True)
+            norm_y, idx_y = torch.linalg.vector_norm(input_estimate, dim=(0)).sort(descending=True)
+
+            grow_x = int(round(math.sqrt(idx_x.shape[0] * drop_blocks / idx_y.shape[0] )))
+            grow_y = int(round(math.sqrt(idx_y.shape[0]  * drop_blocks / idx_x.shape[0])))
+            self.weight_mask.view(self.out_channels, -1)[torch.meshgrid(idx_x[:block_size*grow_x], idx_y[:block_size*grow_y])] = 1
+            self.weight.data.view(self.out_channels, -1)[torch.meshgrid(idx_x[:block_size*grow_x], idx_y[:block_size*grow_y])] = 0
+            # there still exist some overlapped weights, we need add more blocks back to the weight.
+            ii = 0
+            jj = 0
+            while torch.sum(weight_mask) < torch.sum(mask_before):
+                print(torch.sum(weight_mask), torch.sum(mask_before), ii, jj)
+                if torch.sum(norm_x[block_size*(grow_x+ii):block_size*(grow_x+ii+1)]) > torch.sum(norm_y[block_size*(grow_y+jj):block_size*(grow_y+jj+1)]):
+                    ii += 1
+                    self.weight_mask.view(self.out_channels, -1)[torch.meshgrid(idx_x[block_size*(grow_x+ii):block_size*(grow_x+ii+1)], idx_y[block_size*(grow_y+jj):block_size*(grow_y+jj+1)])] = 1
+                    self.weight.data.view(self.out_channels, -1)[torch.meshgrid(idx_x[block_size*(grow_x+ii):block_size*(grow_x+ii+1)], idx_y[block_size*(grow_y+jj):block_size*(grow_y+jj+1)])] = 0
+                else:
+                    jj += 1
+                    self.weight_mask.view(self.out_channels, -1)[torch.meshgrid(idx_x[block_size*(grow_x+ii):block_size*(grow_x+ii+1)], idx_y[block_size*(grow_y+jj):block_size*(grow_y+jj+1)])] = 1
+                    self.weight.data.view(self.out_channels, -1)[torch.meshgrid(idx_x[block_size*(grow_x+ii):block_size*(grow_x+ii+1)], idx_y[block_size*(grow_y+jj):block_size*(grow_y+jj+1)])] = 0
+            grow_mask = torch.logical_and(mask_before==0, self.weight_mask)
+            
+            if block_size > 0 and self.nblocks != 0 and drop_num > 0:
+                self.block_row_idx, self.block_col_idx = extract_dense(self, block_size, self.nblocks, grow_mask=grow_mask)
 
     def forward(self, input):
         self.weight.data = torch.mul(self.weight.detach(), self.weight_mask)
